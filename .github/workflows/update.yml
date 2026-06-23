@@ -25,11 +25,22 @@ jobs:
         run: |
           if git diff --cached --quiet; then
             echo "No changes to commit, skipping."
+            echo "HAS_CHANGES=false" >> $GITHUB_ENV
           else
             git commit -m "AUTO UPDATE [bot]"
+            echo "HAS_CHANGES=true" >> $GITHUB_ENV
           fi
       - name: Push master changes
+        if: env.HAS_CHANGES == 'true'
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: master
+      # 推送飞书通知: 仅当今天有抓到新内容时才推送
+      # continue-on-error: 推送是附加功能, 失败不应让整个 workflow 变红
+      - name: Notify Feishu webhook
+        if: env.HAS_CHANGES == 'true'
+        continue-on-error: true
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+        run: node push-feishu.js
