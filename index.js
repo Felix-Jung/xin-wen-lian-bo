@@ -222,7 +222,7 @@ const newsToMarkdown = ({ date, abstract, news }) => {
 	for (const { title, content, link } of news) {
 		mdNews += `### ${title}\n\n${content}\n\n[查看原文](${link})\n\n`;
 	}
-	return `# 《新闻联播》 (${date})\n\n## 新闻摘要\n\n${abstract || '(暂无简介)'}\n\n## 详细新闻\n\n${mdNews}\n\n---\n\n(更新时间戳: ${new Date().getTime()})\n\n`;
+	return `# 《新闻联播》 (${date})\n\n## 新闻摘要\n\n${abstract || '(暂无简介)'}\n\n## 详细新闻\n\n${mdNews}\n\n---\n\n`;
 }
 
 const saveTextToFile = async (savePath, text) => {
