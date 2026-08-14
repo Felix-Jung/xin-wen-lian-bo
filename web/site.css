@@ -235,61 +235,53 @@ a:hover { color: var(--accent-strong); }
 	padding: 0 1.4rem 1.2rem;
 }
 
-.search-row {
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
-}
-
-.search-tabs {
-	display: flex;
-	flex-shrink: 0;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	overflow: hidden;
-	background: var(--surface);
-}
-
-.search-tab {
-	border: none;
-	background: none;
-	color: var(--muted);
-	font-size: 0.82rem;
-	font-family: inherit;
-	padding: 0.5rem 0.95rem;
-	cursor: pointer;
-	transition: background 0.15s ease, color 0.15s ease;
-}
-
-.search-tab + .search-tab {
-	border-left: 1px solid var(--line);
-}
-
-.search-tab.active {
-	background: var(--accent);
-	color: #fff;
-	font-weight: 600;
-}
-
-.search-tab:not(.active):hover {
-	color: var(--accent);
-}
-
+/* 一体化搜索容器: 内嵌作用域切换 + 图标 + 输入框 */
 .search-box {
 	display: flex;
 	align-items: center;
-	gap: 0.6rem;
-	flex: 1;
 	background: var(--surface);
 	border: 1px solid var(--line);
 	border-radius: 10px;
-	padding: 0.55rem 0.9rem;
+	padding: 0.3rem 0.9rem 0.3rem 0.35rem;
+	gap: 0.2rem;
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .search-box:focus-within {
 	border-color: var(--accent);
 	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 作用域按钮: 选中浅红底红字, 与列表 hover 语言一致 */
+.search-scope {
+	display: flex;
+	gap: 0.15rem;
+	flex-shrink: 0;
+	margin-right: 0.5rem;
+	padding-right: 0.65rem;
+	border-right: 1px solid var(--line);
+}
+
+.scope-btn {
+	border: none;
+	background: none;
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-family: inherit;
+	padding: 0.32rem 0.7rem;
+	border-radius: 7px;
+	cursor: pointer;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.scope-btn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-weight: 600;
+}
+
+.scope-btn:not(.active):hover {
+	color: var(--accent);
 }
 
 .search-box svg { flex-shrink: 0; color: var(--muted); }

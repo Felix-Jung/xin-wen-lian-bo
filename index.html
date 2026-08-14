@@ -40,19 +40,17 @@
 		</section>
 
 		<div class="search-wrap">
-			<div class="search-row">
-				<div class="search-tabs" role="tablist" aria-label="搜索类型">
-					<button type="button" class="search-tab active" data-mode="date" role="tab" aria-selected="true">日期</button>
-					<button type="button" class="search-tab" data-mode="content" role="tab" aria-selected="false">内容</button>
+			<div class="search-box">
+				<div class="search-scope" role="tablist" aria-label="搜索类型">
+					<button type="button" class="scope-btn active" data-mode="date" role="tab" aria-selected="true">日期</button>
+					<button type="button" class="scope-btn" data-mode="content" role="tab" aria-selected="false">内容</button>
 				</div>
-				<label class="search-box">
-					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-						<circle cx="11" cy="11" r="7"></circle>
-						<line x1="21" y1="21" x2="16.5" y2="16.5"></line>
-					</svg>
-					<input id="search" type="search" placeholder="按日期搜索，如 20260810 / 8月10日 / 2026-08-10"
-						autocomplete="off">
-				</label>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+					<circle cx="11" cy="11" r="7"></circle>
+					<line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+				</svg>
+				<input id="search" type="search" placeholder="按日期搜索，如 20260810 / 8月10日 / 2026-08-10"
+					autocomplete="off">
 			</div>
 			<p class="search-result hidden" id="searchResult"></p>
 		</div>
@@ -288,9 +286,9 @@
 				date: '按日期搜索，如 20260810 / 8月10日 / 2026-08-10',
 				content: '按内容搜索，如 台风 / 共同富裕 / 人工智能'
 			};
-			document.querySelectorAll('.search-tab').forEach(btn => {
+			document.querySelectorAll('.scope-btn').forEach(btn => {
 				btn.addEventListener('click', () => {
-					document.querySelectorAll('.search-tab').forEach(b => {
+					document.querySelectorAll('.scope-btn').forEach(b => {
 						b.classList.toggle('active', b === btn);
 						b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
 					});
