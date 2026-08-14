@@ -196,6 +196,8 @@
 				})
 				.then(json => {
 					if (!Array.isArray(json) || json.length === 0) throw new Error('empty');
+					// 保险: 按日期降序, 不依赖 catalogue 存储顺序
+					json.sort((a, b) => (a.date < b.date ? 1 : -1));
 					renderHero(json);
 					renderList(json);
 				})

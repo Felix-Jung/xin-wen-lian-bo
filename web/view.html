@@ -104,12 +104,13 @@
 						'<p><a href="/">返回目录</a></p>';
 				});
 
-				// 上一篇 / 下一篇: 从 catalogue 找相邻日期
+				// 上一篇 / 下一篇: 从 catalogue 找相邻日期 (按日期降序)
 				fetch('/news/catalogue.json').then(r => r.json()).then(json => {
-					const idx = json.findIndex(item => item.date === date);
+					const sorted = [...json].sort((a, b) => (a.date < b.date ? 1 : -1));
+					const idx = sorted.findIndex(item => item.date === date);
 					if (idx < 0) return;
-					const prev = json[idx + 1];
-					const next = json[idx - 1];
+					const prev = sorted[idx + 1];
+					const next = sorted[idx - 1];
 					if (prev) {
 						document.getElementById('navPrev').href = `/web/view?date=${prev.date}`;
 						document.getElementById('navPrevDate').textContent = formatDate(prev.date);
