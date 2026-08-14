@@ -2,6 +2,11 @@ name: Update today xin wen lian bo
 
 on:
   workflow_dispatch:
+    inputs:
+      date:
+        description: '抓取指定日期 YYYYMMDD (留空=今天)'
+        required: false
+        default: ''
   schedule:
     # 东八区 (UTC+8), 所以要-8小时
     - cron: '30 12 * * *'
@@ -16,7 +21,14 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: npm run index
+      # 手动触发时可指定日期补数据/重跑; 定时触发留空则抓今天
+      - name: Fetch news
+        run: |
+          if [ -n "${{ inputs.date }}" ]; then
+            npm run index -- --date ${{ inputs.date }}
+          else
+            npm run index
+          fi
       - run: git config --local user.email "github-actions[bot]@github.com"
       - run: git config --local user.name "github-actions[bot]"
       - run: git add .
@@ -30,8 +42,11 @@ jobs:
             git commit -m "AUTO UPDATE [bot]"
             echo "HAS_CHANGES=true" >> $GITHUB_ENV
           fi
+      # 容错: push 失败不中止 job, 后面的飞书通知照常执行
+      # (否则 push 失败会导致整个 job 红 + 飞书被跳过)
       - name: Push master changes
         if: env.HAS_CHANGES == 'true'
+        continue-on-error: true
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
