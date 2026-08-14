@@ -1,81 +1,119 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 	<head>
 		<meta charset="UTF-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>新闻联播文字稿</title>
-		<link rel="stylesheet" href="web/github-markdown.min.css">
-		<script src="web/showdown.min.js"></script>
+		<title>新闻联播文字稿存档</title>
+		<meta name="description" content="每日《新闻联播》完整文字稿存档，晚间自动更新。">
+		<link rel="stylesheet" href="web/site.css">
 	</head>
 	<body>
-		<div id="view" class="markdown-body">加载中...</div>
-		<style>
-			html, 
-			body, 
-			.markdown-body {
-				padding: 0;
-				border: none;
-				margin: 0;
-				height: 100%;
-				width: 100%;
-				word-break: break-all;
-				box-sizing: border-box;
-			}
-			.markdown-body {
-				padding: 1.2em;
-				overflow: auto;
-			}
-		</style>
+		<header class="site-header">
+			<div class="site-header-inner">
+				<div class="brand">
+					<span class="brand-logo" aria-hidden="true">联</span>
+					<div>
+						<h1>新闻联播文字稿</h1>
+						<p>每日《新闻联播》完整文字稿存档，晚间自动更新</p>
+					</div>
+				</div>
+				<div class="site-stats" id="stats">加载中…</div>
+			</div>
+		</header>
+
+		<main id="list">
+			<p class="article-loading" style="padding:0;">加载中…</p>
+		</main>
+
+		<footer class="site-footer">
+			<div class="site-footer-inner">
+				<span>文字稿数据来源：央视网《新闻联播》节目</span>
+				<span>本页为个人学习存档，不代表官方立场</span>
+			</div>
+		</footer>
+
 		<script>
-			fetch(`/news/catalogue.json`).then(response => {
-				return response.json();
-			}).then(json => {
-				render(json);
-			});
-			function render(json) {
-				/* 
-				json: [
-					{
-					"date": "20220929"
-					"abstract": "123\n456"
+			// 工具: YYYYMMDD -> {year, month, day, label}
+			const parseDate = d => {
+				if (!/^\d{8}$/.test(d)) return null;
+				return {
+					year: d.slice(0, 4),
+					month: parseInt(d.slice(4, 6), 10),
+					day: parseInt(d.slice(6, 8), 10),
+					label: `${parseInt(d.slice(4, 6), 10)}月${parseInt(d.slice(6, 8), 10)}日`
+				};
+			};
+
+			// 摘要压缩: 多行 -> 单行, 截断
+			const summarize = (abs, max) => {
+				const flat = (abs || '').replace(/\s*\n\s*/g, ' ').trim();
+				return flat.length > max ? flat.slice(0, max) + '…' : flat;
+			};
+
+			// 按月份分组渲染目录
+			const render = json => {
+				if (!Array.isArray(json) || json.length === 0) {
+					document.getElementById('list').innerHTML = '<p>暂无数据</p>';
+					return;
+				}
+
+				// 统计信息
+				const latest = parseDate(json[0].date);
+				const spanStart = parseDate(json[json.length - 1].date);
+				document.getElementById('stats').innerHTML =
+					`共 <strong>${json.length}</strong> 期 · ` +
+					`最新 <strong>${latest.label}</strong> · ` +
+					`自 ${spanStart.year} 年${spanStart.month} 月起`;
+
+				// 按月分组 (catalogue 已按新->旧排列)
+				const groups = [];
+				for (const item of json) {
+					const d = parseDate(item.date);
+					if (!d) continue;
+					const key = `${d.year}年${d.month}月`;
+					const last = groups[groups.length - 1];
+					if (last && last.key === key) last.items.push(item);
+					else groups.push({ key, items: [item] });
+				}
+
+				let html = '';
+				for (const g of groups) {
+					html += `<section class="month">
+						<div class="month-head">
+							<h2>${g.key}</h2>
+							<span class="count">${g.items.length} 期</span>
+						</div>
+						<ul class="news-list">`;
+					for (const item of g.items) {
+						const d = parseDate(item.date);
+						const abs = summarize(item.abstract, 60);
+						const latestMark = item === json[0]
+							? '<span class="news-latest">最新</span>'
+							: '';
+						html += `<li>
+							<a href="web/view.html?date=${item.date}" title="${d.label}《新闻联播》文字稿">
+								<span class="news-date">${d.label}</span>
+								<span class="news-abs">${abs}</span>
+								${latestMark}
+							</a>
+						</li>`;
 					}
-				]
-				*/
-				let md = `# 《新闻联播》文字稿\n` + 
-						"\n" + 
-						"每日20-22点自动更新当日文字稿\n" + 
-						"\n" + 
-						"开源地址: https://github.com/DuckBurnIncense/xin-wen-lian-bo\n" + 
-						"\n" + 
-						"## 目录: \n" + 
-						"\n";
-				json.forEach(theNew => {
-					let date = theNew.date;
-					let abstract = theNew.abstract.replaceAll("\n", ' ');
-					md += `- 《新闻联播》 (${date}) [\[查看摘要\]](#${date})  [\[阅读全篇\]](web/view.html?date=${date})\n`;
+					html += '</ul></section>';
+				}
+				document.getElementById('list').innerHTML = html;
+			};
+
+			fetch('/news/catalogue.json')
+				.then(r => {
+					if (!r.ok) throw new Error('HTTP ' + r.status);
+					return r.json();
+				})
+				.then(render)
+				.catch(() => {
+					document.getElementById('list').innerHTML =
+						'<p>数据加载失败，请稍后重试。</p>';
+					document.getElementById('stats').textContent = '加载失败';
 				});
-				md += `## 新闻摘要\n` + 
-						"\n";
-				json.forEach(theNew => {
-					let date = theNew.date;
-					let abstract = theNew.abstract.replaceAll("\n", ' ');
-					md += `### [《新闻联播》 (${date})](web/view.html?date=${date}) {${date}}` + 
-						"\n" + 
-						`${abstract}\n` + 
-						"\n" + 
-						`[阅读全文](web/view.html?date=${date})\n` + 
-						"\n" + 
-						"\n";
-				});
-				md += `\n&copy; 2022 [DuckBurnIncense](mailto:DuckBurnIncense@outlook.com) 开源地址: [https://github.com/DuckBurnIncense/xin-wen-lian-bo](https://github.com/DuckBurnIncense/xin-wen-lian-bo)\n`
-				const viewElement = document.getElementById('view');
-				const converter = new showdown.Converter({ 
-					customizedHeaderId: true, 
-					openLinksInNewWindow: true
-				});
-				viewElement.innerHTML = converter.makeHtml(md);
-			}
 		</script>
 	</body>
 </html>

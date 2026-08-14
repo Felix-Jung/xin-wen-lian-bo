@@ -1,32 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 	<head>
 		<meta charset="UTF-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>{{date}} - 新闻联播文字稿查看</title>
-		<link rel="stylesheet" href="./github-markdown.min.css">
+		<title>新闻联播文字稿查看</title>
+		<link rel="stylesheet" href="./site.css">
 		<script src="./showdown.min.js"></script>
 	</head>
 	<body>
-		<div id="view" class="markdown-body">加载中...</div>
-		<style>
-			html, 
-			body, 
-			.markdown-body {
-				padding: 0;
-				border: none;
-				margin: 0;
-				height: 100%;
-				width: 100%;
-				word-break: break-all;
-				box-sizing: border-box;
-			}
-			.markdown-body {
-				padding: 1.2em;
-				overflow: auto;
-			}
-		</style>
+		<header class="view-bar">
+			<div class="view-bar-inner">
+				<a class="view-back" href="/">← 返回目录</a>
+				<div class="view-title" id="viewTitle">新闻联播文字稿</div>
+			</div>
+		</header>
+
+		<article class="article markdown-body" id="view">加载中…</article>
+
 		<script>
 			function getQueryString(name) {
 				var reg = new RegExp('(^|&)' + name + '=([^&]*)(&|$)', 'i');
@@ -34,23 +24,36 @@
 				if (r != null) return unescape(r[2]);
 				return null;
 			}
+
+			// YYYYMMDD -> 2026年8月13日
+			function formatDate(d) {
+				if (!/^\d{8}$/.test(d)) return d;
+				return d.slice(0, 4) + '年' +
+					parseInt(d.slice(4, 6), 10) + '月' +
+					parseInt(d.slice(6, 8), 10) + '日';
+			}
+
 			const date = getQueryString('date') || 'Error';
-			document.title = document.title.replace('{{date}}', date);
+			const dateStr = formatDate(date);
+			const title = `${dateStr}《新闻联播》文字稿`;
+			document.title = title;
+			document.getElementById('viewTitle').textContent = title;
+
 			fetch(`/news/${date}.md`).then(response => {
-				if(response.status < 200 || response.status > 300) throw Error(response.statusText);
+				if (response.status < 200 || response.status > 300) throw Error(response.statusText);
 				return response.text();
 			}).then(md => {
-				render(md);
-			}).catch(e => {
-				fetch(`./Error.md`).then(errResponse => {
-					return errResponse.text();
-				}).then(errMd => {
-					render(errMd);
+				const converter = new showdown.Converter({
+					customizedHeaderId: true,
+					openLinksInNewWindow: true
 				});
+				document.getElementById('view').innerHTML = converter.makeHtml(md);
+			}).catch(e => {
+				document.getElementById('view').innerHTML =
+					'<h1>未找到该日期的文字稿</h1>' +
+					'<p>可能是当天节目尚未播出，或日期填写有误。</p>' +
+					'<p><a href="/">返回目录</a></p>';
 			});
-			function render(markdown) {
-				document.getElementById('view').innerHTML = new showdown.Converter().makeHtml(markdown);
-			}
 		</script>
 	</body>
 </html>
