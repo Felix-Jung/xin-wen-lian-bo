@@ -62,6 +62,10 @@ jobs:
         env:
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
         run: node push-feishu.js
+      # 构建全文搜索分片 (search/YYYY.json): 每天抓取后重建, 供网页内容模式全文检索
+      - name: Build search index
+        if: env.HAS_CHANGES == 'true' || github.event_name == 'workflow_dispatch'
+        run: node build-search-index.js
       # 同步到 Cloudflare Pages (网页版): 有新内容时自动部署; 手动触发(含纯代码改动)也部署
       # continue-on-error: 部署失败不影响数据已入库
       - name: Deploy to Cloudflare Pages

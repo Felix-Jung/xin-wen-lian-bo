@@ -399,6 +399,24 @@ main { max-width: 960px; margin: 0 auto; padding: 0.6rem 1.4rem 3.5rem; }
 	margin-top: -0.4rem;
 }
 
+/* 全文命中标记: 提要里没有、正文里命中 */
+.news-list li { position: relative; }
+
+.news-list li.ft-only::before {
+	content: "正文";
+	position: absolute;
+	right: 0.6rem;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 0.62rem;
+	line-height: 1;
+	color: var(--accent);
+	border: 1px solid var(--accent);
+	border-radius: 4px;
+	padding: 0.2em 0.35em;
+	pointer-events: none;
+}
+
 @media (max-width: 640px) {
 	.news-list a { grid-template-columns: 6.2em 1fr; gap: 0.15rem 0.8rem; }
 	.news-weekday { grid-column: 2; margin-top: -0.5rem; }

@@ -175,32 +175,112 @@
 
 			// ─────────── 搜索过滤 ───────────
 
-			const doSearch = () => {
-				const q = document.getElementById('search').value.trim().toLowerCase();
-				const resultEl = document.getElementById('searchResult');
-				const index = searchMode === 'date' ? dateIndex : contentIndex;
-				let visible = 0;
+			let debounceTimer = 0;
 
+			const hideByMonths = () => {
+				document.querySelectorAll('main .month').forEach(sec => {
+					sec.classList.toggle('hidden', !sec.querySelector('li:not(.hidden)'));
+				});
+			};
+
+			// 日期模式: 只匹配日期文本
+			const doDateSearch = lq => {
+				let visible = 0;
 				document.querySelectorAll('main li[data-date]').forEach(li => {
 					const idx = +li.dataset.idx;
-					const hit = !q || (index[idx] && index[idx].includes(q));
+					const hit = !lq || (dateIndex[idx] && dateIndex[idx].includes(lq));
 					li.classList.toggle('hidden', !hit);
+					li.classList.toggle('ft-only', false);
 					if (hit) visible++;
 				});
-
-				document.querySelectorAll('main .month').forEach(sec => {
-					const any = sec.querySelector('li:not(.hidden)');
-					sec.classList.toggle('hidden', !any);
-				});
-
-				if (q) {
+				hideByMonths();
+				const resultEl = document.getElementById('searchResult');
+				if (lq) {
 					resultEl.classList.remove('hidden');
 					resultEl.textContent = visible === 0
-						? (searchMode === 'date' ? '没有找到匹配的日期' : '没有找到匹配的内容')
+						? '没有找到匹配的日期'
 						: `找到 ${visible} 期匹配结果`;
 				} else {
 					resultEl.classList.add('hidden');
 				}
+			};
+
+			// 内容模式: 摘要即时过滤 + 全文分片异步检索合并
+			const renderContentResults = (lq, progress) => {
+				let shown = 0, summaryCount = 0;
+				document.querySelectorAll('main li[data-date]').forEach(li => {
+					const idx = +li.dataset.idx;
+					const inSummary = !lq || (contentIndex[idx] && contentIndex[idx].includes(lq));
+					const inFull = lq && fullHits.has(li.dataset.date);
+					const show = inSummary || inFull;
+					li.classList.toggle('hidden', !show);
+					// 标记"仅正文命中"(提要里没有, 正文里有)
+					li.classList.toggle('ft-only', show && !inSummary);
+					if (inSummary) summaryCount++;
+					if (show) shown++;
+				});
+				hideByMonths();
+				const resultEl = document.getElementById('searchResult');
+				if (lq) {
+					resultEl.classList.remove('hidden');
+					let text = `找到 ${shown} 期`;
+					if (shown > summaryCount) {
+						text += ` (提要 ${summaryCount} + 正文 ${shown - summaryCount})`;
+					}
+					if (progress) text += ` · ${progress}`;
+					resultEl.textContent = text;
+				} else {
+					resultEl.classList.add('hidden');
+				}
+			};
+
+			const doSearch = () => {
+				const lq = document.getElementById('search').value.trim().toLowerCase();
+				if (searchMode === 'date') {
+					ftToken++; // 取消进行中的全文检索
+					fullHits = new Set();
+					doDateSearch(lq);
+				} else {
+					renderContentResults(lq); // 先出摘要结果
+					clearTimeout(debounceTimer);
+					debounceTimer = setTimeout(() => runFullText(lq), 300);
+				}
+			};
+
+			// ─────────── 全文检索 (按年分片懒加载) ───────────
+
+			const fullTextCache = {}; // 年份 -> [{d,t}]
+			let ftToken = 0;          // 并发控制: 新搜索使旧任务失效
+			let fullHits = new Set(); // 正文命中的日期集合
+
+			const yearList = () => {
+				const ys = new Set(allItems.map(i => i.date.slice(0, 4)));
+				return [...ys].sort().reverse();
+			};
+
+			const runFullText = async lq => {
+				const my = ++ftToken;
+				fullHits = new Set();
+				if (lq.length < 2) return; // 单字不做全文检索
+				for (const y of yearList()) {
+					if (ftToken !== my) return;
+					if (!(y in fullTextCache)) {
+						try {
+							const r = await fetch(`/search/${y}.json`);
+							fullTextCache[y] = r.ok ? await r.json() : null;
+						} catch {
+							fullTextCache[y] = null;
+						}
+					}
+					if (ftToken !== my) return;
+					const shard = fullTextCache[y] || [];
+					for (const item of shard) {
+						if (item.t.toLowerCase().includes(lq)) fullHits.add(item.d);
+					}
+					renderContentResults(lq, `全文检索中 ${y}年…`);
+				}
+				if (ftToken !== my) return;
+				renderContentResults(lq);
 			};
 
 			// 搜索模式切换 (日期 / 内容)
