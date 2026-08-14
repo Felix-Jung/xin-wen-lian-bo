@@ -141,7 +141,14 @@ const getNewsList = async date => {
  * @returns {Promise<string>} 简介内容
  */
 const getAbstract = async link => {
-	const HTML = await fetch(link);
+	let HTML;
+	try {
+		HTML = await fetch(link);
+	} catch (err) {
+		// 历史日期的简介页可能已被央视下架 (404), 容错返回空摘要
+		console.warn(`简介页抓取失败, 摘要留空: ${err.message}`);
+		return '';
+	}
 	if (isErrorPage(HTML)) {
 		console.warn('简介页返回 ERROR, 摘要留空');
 		return '';
@@ -278,12 +285,15 @@ const main = async () => {
 	}
 	const md = newsToMarkdown({ date: DATE, abstract, news });
 	await saveTextToFile(NEWS_MD_PATH, md);
-	await updateCatalogue({
-		catalogueJsonPath: CATALOGUE_JSON_PATH,
-		readmeMdPath: README_PATH,
-		date: DATE,
-		abstract
-	});
+	// SKIP_CATALOGUE=1 时只写 md 不更新 catalogue/README (批量补历史时避免并发写冲突, 最后统一重建)
+	if (!process.env.SKIP_CATALOGUE) {
+		await updateCatalogue({
+			catalogueJsonPath: CATALOGUE_JSON_PATH,
+			readmeMdPath: README_PATH,
+			date: DATE,
+			abstract
+		});
+	}
 	console.log('全部成功, 程序结束');
 }
 
