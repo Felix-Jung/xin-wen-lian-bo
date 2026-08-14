@@ -5,6 +5,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>新闻联播文字稿存档</title>
 		<meta name="description" content="每日《新闻联播》完整文字稿存档，晚间自动更新。">
+		<link rel="icon" href="web/favicon.svg" type="image/svg+xml">
 		<link rel="stylesheet" href="web/site.css">
 	</head>
 	<body>
@@ -97,7 +98,6 @@
 			const renderHero = json => {
 				const latest = parseDate(json[0].date);
 				const earliest = parseDate(json[json.length - 1].date);
-				const years = (latest.year + latest.month / 12) - (earliest.year + earliest.month / 12);
 
 				document.getElementById('topMeta').innerHTML =
 					`共 <strong>${json.length}</strong> 期 · 最新 <strong>${latest.label}</strong>`;
@@ -108,7 +108,7 @@
 				document.getElementById('heroStats').innerHTML = `
 					<div class="stat"><strong>${json.length}</strong><span>期存档</span></div>
 					<div class="stat"><strong>${latest.year}.${String(latest.month).padStart(2, '0')}.${String(latest.day).padStart(2, '0')}</strong><span>最新一期</span></div>
-					<div class="stat"><strong>${years.toFixed(1)}</strong><span>年连续记录</span></div>`;
+					<div class="stat"><strong>${earliest.year}.${String(earliest.month).padStart(2, '0')}.${String(earliest.day).padStart(2, '0')}</strong><span>最早一期</span></div>`;
 
 				document.getElementById('cardDate').textContent =
 					`${latest.year}年${latest.month}月${latest.day}日 · 星期${latest.weekday}`;
