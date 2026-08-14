@@ -12,15 +12,13 @@ const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK;
 // 干跑模式: 设置 FEISHU_DRY_RUN=1 时只打印消息不发送, 用于本地调试
 const DRY_RUN = process.env.FEISHU_DRY_RUN === '1';
 
-// GitHub 仓库地址 (用于消息里的"查看全文"链接, 默认指向本 fork)
-const REPO_URL =
-	process.env.REPO_URL || 'https://github.com/Felix-Jung/xin-wen-lian-bo';
+// 网页版地址 (消息里"查看完整版"按钮的链接, 默认指向 Cloudflare Pages 部署的网页版)
+const REPO_URL = process.env.REPO_URL || 'https://xin-wen-lian-bo.pages.dev';
 
 // catalogue.json 与 news 目录路径
 const CATALOGUE_JSON_PATH = path.join(__dirname, 'news', 'catalogue.json');
 
-// 飞书单条消息体上限约 30KB, 留出卡片 JSON 结构开销, 正文最多 26KB
-const MAX_CONTENT_BYTES = 26 * 1024;
+// 飞书单条消息体上限约 30KB, 摘要本身很小, 无需截断
 
 // ───────────────────────── 工具 ─────────────────────────
 
@@ -44,40 +42,19 @@ const getLatest = () => {
 	return catalogue[0];
 };
 
-// 读取指定日期的完整文字稿 md, 去掉首行标题和结尾时间戳 (卡片 header 已有标题)
-const getMdContent = date => {
-	const mdPath = path.join(__dirname, 'news', `${date}.md`);
-	const raw = fs.readFileSync(mdPath, 'utf-8');
-	return raw
-		.replace(/^# .*?\n+/, '')
-		.replace(/\n*\(更新时间戳: \d+\)\s*$/, '')
-		.replace(/\n{3,}/g, '\n')
-		.trim();
-};
-
-// 按 UTF-8 字节数截断 (中文 3 字节), 避免切断字符; 超限时末尾提示查看全文
-const truncateUtf8 = (str, maxBytes) => {
-	if (Buffer.byteLength(str, 'utf-8') <= maxBytes) return str;
-	let s = str;
-	while (Buffer.byteLength(s, 'utf-8') > maxBytes - 200) {
-		s = s.slice(0, -100);
-	}
-	// 逐字符收尾, 确保不切在字符中间
-	while (Buffer.byteLength(s, 'utf-8') > maxBytes - 200) {
-		s = s.slice(0, -1);
-	}
-	return `${s}\n\n…… (内容过长已截断, 点击下方按钮查看完整文字稿)`;
-};
-
-// 组装飞书 interactive 消息卡片: 标题 + 完整文字稿 + 查看全文链接
-const buildMessage = ({ date }) => {
-	const url = `${REPO_URL}/blob/master/news/${date}.md`;
+// 组装飞书 interactive 消息卡片: 标题 + 摘要 + 查看完整版链接
+const buildMessage = ({ date, abstract }) => {
+	// 完整版链接指向 Cloudflare Pages 网页版 (渲染好的 markdown)
+	const url = `${REPO_URL}/web/view?date=${date}`;
 	const dateStr = formatDate(date);
 
-	// 完整文字稿 (md 内容), 超长时截断以适配飞书单条消息限制
-	const content = truncateUtf8(getMdContent(date), MAX_CONTENT_BYTES);
+	// 摘要可能为空 (简介抓取失败), 给个兜底
+	// 央视原数据含大量 \n\n\n, 压缩为单个换行让卡片更紧凑
+	const safeAbstract = (abstract || '')
+		.replace(/\n{3,}/g, '\n')
+		.trim() || '(本期暂无摘要)';
 
-	// 飞书 interactive 卡片: 标题 + 完整文字稿 + 查看全文链接
+	// 飞书 interactive 卡片: 标题 + 摘要 + 查看完整版链接
 	return {
 		msg_type: 'interactive',
 		card: {
@@ -94,7 +71,7 @@ const buildMessage = ({ date }) => {
 					tag: 'div',
 					text: {
 						tag: 'lark_md',
-						content,
+						content: safeAbstract,
 					},
 				},
 				{
