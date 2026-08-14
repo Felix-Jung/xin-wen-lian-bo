@@ -40,14 +40,20 @@
 		</section>
 
 		<div class="search-wrap">
-			<label class="search-box">
-				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-					<circle cx="11" cy="11" r="7"></circle>
-					<line x1="21" y1="21" x2="16.5" y2="16.5"></line>
-				</svg>
-				<input id="search" type="search" placeholder="搜索日期或新闻内容，如 台风 / 共同富裕 / 20260810"
-					autocomplete="off">
-			</label>
+			<div class="search-row">
+				<div class="search-tabs" role="tablist" aria-label="搜索类型">
+					<button type="button" class="search-tab active" data-mode="date" role="tab" aria-selected="true">日期</button>
+					<button type="button" class="search-tab" data-mode="content" role="tab" aria-selected="false">内容</button>
+				</div>
+				<label class="search-box">
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+						<circle cx="11" cy="11" r="7"></circle>
+						<line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+					</svg>
+					<input id="search" type="search" placeholder="按日期搜索，如 20260810 / 8月10日 / 2026-08-10"
+						autocomplete="off">
+				</label>
+			</div>
 			<p class="search-result hidden" id="searchResult"></p>
 		</div>
 
@@ -85,17 +91,22 @@
 				return flat.length > max ? flat.slice(0, max) + '…' : flat;
 			};
 
-			// 可搜索文本: 日期各种写法 + 完整摘要 (摘要含全部新闻标题, 支持内容搜索)
-			const searchable = item => {
+			// 日期可搜索文本: 各种日期写法
+			const dateText = item => {
 				const d = parseDate(item.date);
-				const flat = (item.abstract || '').replace(/\s*\n\s*/g, ' ');
-				return `${item.date} ${d.year}年${d.month}月${d.day}日 ${d.label} ${flat}`.toLowerCase();
+				return `${item.date} ${d.year}年${d.month}月${d.day}日 ${d.label}`.toLowerCase();
 			};
+
+			// 内容可搜索文本: 完整摘要 (含全部新闻标题)
+			const contentText = item =>
+				(item.abstract || '').replace(/\s*\n\s*/g, ' ').toLowerCase();
 
 			// ─────────── 渲染 ───────────
 
 			let allItems = [];
-			let searchIndex = [];
+			let dateIndex = [];
+			let contentIndex = [];
+			let searchMode = 'date'; // 'date' | 'content'
 
 			const renderHero = json => {
 				const latest = parseDate(json[0].date);
@@ -120,8 +131,9 @@
 
 			const renderList = json => {
 				allItems = json;
-				// 预计算可搜索文本 (完整摘要含全部新闻标题, 供内容搜索)
-				searchIndex = json.map(searchable);
+				// 预计算两类搜索索引: 日期 / 内容(完整摘要)
+				dateIndex = json.map(dateText);
+				contentIndex = json.map(contentText);
 
 				// 按月分组 (新 -> 旧)
 				const groups = [];
@@ -166,11 +178,12 @@
 			const doSearch = () => {
 				const q = document.getElementById('search').value.trim().toLowerCase();
 				const resultEl = document.getElementById('searchResult');
+				const index = searchMode === 'date' ? dateIndex : contentIndex;
 				let visible = 0;
 
 				document.querySelectorAll('main li[data-date]').forEach(li => {
 					const idx = +li.dataset.idx;
-					const hit = !q || (searchIndex[idx] && searchIndex[idx].includes(q));
+					const hit = !q || (index[idx] && index[idx].includes(q));
 					li.classList.toggle('hidden', !hit);
 					if (hit) visible++;
 				});
@@ -183,12 +196,30 @@
 				if (q) {
 					resultEl.classList.remove('hidden');
 					resultEl.textContent = visible === 0
-						? '没有找到匹配的日期'
+						? (searchMode === 'date' ? '没有找到匹配的日期' : '没有找到匹配的内容')
 						: `找到 ${visible} 期匹配结果`;
 				} else {
 					resultEl.classList.add('hidden');
 				}
 			};
+
+			// 搜索模式切换 (日期 / 内容)
+			const PLACEHOLDERS = {
+				date: '按日期搜索，如 20260810 / 8月10日 / 2026-08-10',
+				content: '按内容搜索，如 台风 / 共同富裕 / 人工智能'
+			};
+			document.querySelectorAll('.search-tab').forEach(btn => {
+				btn.addEventListener('click', () => {
+					document.querySelectorAll('.search-tab').forEach(b => {
+						b.classList.toggle('active', b === btn);
+						b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+					});
+					searchMode = btn.dataset.mode;
+					const input = document.getElementById('search');
+					input.placeholder = PLACEHOLDERS[searchMode];
+					doSearch();
+				});
+			});
 
 			document.getElementById('search').addEventListener('input', doSearch);
 

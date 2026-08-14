@@ -235,10 +235,51 @@ a:hover { color: var(--accent-strong); }
 	padding: 0 1.4rem 1.2rem;
 }
 
+.search-row {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.search-tabs {
+	display: flex;
+	flex-shrink: 0;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	overflow: hidden;
+	background: var(--surface);
+}
+
+.search-tab {
+	border: none;
+	background: none;
+	color: var(--muted);
+	font-size: 0.82rem;
+	font-family: inherit;
+	padding: 0.5rem 0.95rem;
+	cursor: pointer;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-tab + .search-tab {
+	border-left: 1px solid var(--line);
+}
+
+.search-tab.active {
+	background: var(--accent);
+	color: #fff;
+	font-weight: 600;
+}
+
+.search-tab:not(.active):hover {
+	color: var(--accent);
+}
+
 .search-box {
 	display: flex;
 	align-items: center;
 	gap: 0.6rem;
+	flex: 1;
 	background: var(--surface);
 	border: 1px solid var(--line);
 	border-radius: 10px;
