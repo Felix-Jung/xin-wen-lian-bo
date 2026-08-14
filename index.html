@@ -8,21 +8,50 @@
 		<link rel="stylesheet" href="web/site.css">
 	</head>
 	<body>
-		<header class="site-header">
-			<div class="site-header-inner">
+		<header class="topbar">
+			<div class="topbar-inner">
 				<div class="brand">
 					<span class="brand-logo" aria-hidden="true">联</span>
 					<div>
-						<h1>新闻联播文字稿</h1>
-						<p>每日《新闻联播》完整文字稿存档，晚间自动更新</p>
+						<div class="brand-name">新闻联播文字稿</div>
+						<div class="brand-sub">央视《新闻联播》完整文字稿存档</div>
 					</div>
 				</div>
-				<div class="site-stats" id="stats">加载中…</div>
+				<div class="topbar-meta" id="topMeta">加载中…</div>
 			</div>
 		</header>
 
+		<section class="hero">
+			<div class="hero-copy">
+				<p class="hero-eyebrow">每日 19:00 播出 · 晚间自动更新</p>
+				<h1>新闻联播<span class="thin">文字稿</span></h1>
+				<p class="hero-sub" id="heroSub">加载中…</p>
+				<div class="hero-stats" id="heroStats"></div>
+			</div>
+			<aside class="hero-card" id="heroCard">
+				<div class="hero-card-head">
+					<span class="badge-latest">最新</span>
+					<time id="cardDate">…</time>
+				</div>
+				<p class="card-abs" id="cardAbs">加载中…</p>
+				<a class="btn" id="cardBtn" href="#">阅读本期全文 <span aria-hidden="true">→</span></a>
+			</aside>
+		</section>
+
+		<div class="search-wrap">
+			<label class="search-box">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+					<circle cx="11" cy="11" r="7"></circle>
+					<line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+				</svg>
+				<input id="search" type="search" placeholder="按日期搜索，如 20260810 / 8月10日 / 2026-08-10"
+					autocomplete="off">
+			</label>
+			<p class="search-result hidden" id="searchResult"></p>
+		</div>
+
 		<main id="list">
-			<p class="article-loading" style="padding:0;">加载中…</p>
+			<p class="state-msg">加载中…</p>
 		</main>
 
 		<footer class="site-footer">
@@ -33,39 +62,64 @@
 		</footer>
 
 		<script>
-			// 工具: YYYYMMDD -> {year, month, day, label}
+			// ─────────── 工具 ───────────
+
+			const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+			// YYYYMMDD -> {year, month, day, label, weekday, key}
 			const parseDate = d => {
 				if (!/^\d{8}$/.test(d)) return null;
+				const y = +d.slice(0, 4), m = +d.slice(4, 6), day = +d.slice(6, 8);
 				return {
-					year: d.slice(0, 4),
-					month: parseInt(d.slice(4, 6), 10),
-					day: parseInt(d.slice(6, 8), 10),
-					label: `${parseInt(d.slice(4, 6), 10)}月${parseInt(d.slice(6, 8), 10)}日`
+					year: y, month: m, day,
+					label: `${m}月${day}日`,
+					weekday: WEEKDAYS[new Date(y, m - 1, day).getDay()],
+					key: d
 				};
 			};
 
-			// 摘要压缩: 多行 -> 单行, 截断
+			// 摘要: 多行 -> 单行, 截断
 			const summarize = (abs, max) => {
 				const flat = (abs || '').replace(/\s*\n\s*/g, ' ').trim();
 				return flat.length > max ? flat.slice(0, max) + '…' : flat;
 			};
 
-			// 按月份分组渲染目录
-			const render = json => {
-				if (!Array.isArray(json) || json.length === 0) {
-					document.getElementById('list').innerHTML = '<p>暂无数据</p>';
-					return;
-				}
+			// 可搜索文本: 日期各种写法 + 摘要
+			const searchable = item => {
+				const d = parseDate(item.date);
+				return `${item.date} ${d.year}年${d.month}月${d.day}日 ${d.label} ${summarize(item.abstract, 200)}`.toLowerCase();
+			};
 
-				// 统计信息
+			// ─────────── 渲染 ───────────
+
+			let allItems = [];
+
+			const renderHero = json => {
 				const latest = parseDate(json[0].date);
-				const spanStart = parseDate(json[json.length - 1].date);
-				document.getElementById('stats').innerHTML =
-					`共 <strong>${json.length}</strong> 期 · ` +
-					`最新 <strong>${latest.label}</strong> · ` +
-					`自 ${spanStart.year} 年${spanStart.month} 月起`;
+				const earliest = parseDate(json[json.length - 1].date);
+				const years = (latest.year + latest.month / 12) - (earliest.year + earliest.month / 12);
 
-				// 按月分组 (catalogue 已按新->旧排列)
+				document.getElementById('topMeta').innerHTML =
+					`共 <strong>${json.length}</strong> 期 · 最新 <strong>${latest.label}</strong>`;
+
+				document.getElementById('heroSub').textContent =
+					`自 ${earliest.year} 年 ${earliest.month} 月起至今，完整收录 ${json.length} 期《新闻联播》文字稿，每晚自动更新。`;
+
+				document.getElementById('heroStats').innerHTML = `
+					<div class="stat"><strong>${json.length}</strong><span>期存档</span></div>
+					<div class="stat"><strong>${latest.year}.${String(latest.month).padStart(2, '0')}.${String(latest.day).padStart(2, '0')}</strong><span>最新一期</span></div>
+					<div class="stat"><strong>${years.toFixed(1)}</strong><span>年连续记录</span></div>`;
+
+				document.getElementById('cardDate').textContent =
+					`${latest.year}年${latest.month}月${latest.day}日 · 星期${latest.weekday}`;
+				document.getElementById('cardAbs').textContent = summarize(json[0].abstract, 220);
+				document.getElementById('cardBtn').href = `web/view.html?date=${latest.key}`;
+			};
+
+			const renderList = json => {
+				allItems = json;
+
+				// 按月分组 (新 -> 旧)
 				const groups = [];
 				for (const item of json) {
 					const d = parseDate(item.date);
@@ -78,7 +132,7 @@
 
 				let html = '';
 				for (const g of groups) {
-					html += `<section class="month">
+					html += `<section class="month" data-month="${g.key}">
 						<div class="month-head">
 							<h2>${g.key}</h2>
 							<span class="count">${g.items.length} 期</span>
@@ -87,14 +141,14 @@
 					for (const item of g.items) {
 						const d = parseDate(item.date);
 						const abs = summarize(item.abstract, 60);
-						const latestMark = item === json[0]
-							? '<span class="news-latest">最新</span>'
-							: '';
-						html += `<li>
+						const flag = item === json[0] ? '<span class="news-latest-flag">● 最新一期</span>' : '';
+						html += `<li data-date="${item.date}" data-search="${searchable(item)}">
 							<a href="web/view.html?date=${item.date}" title="${d.label}《新闻联播》文字稿">
 								<span class="news-date">${d.label}</span>
+								<span class="news-weekday">星期${d.weekday}</span>
 								<span class="news-abs">${abs}</span>
-								${latestMark}
+								<span class="news-arrow">→</span>
+								${flag}
 							</a>
 						</li>`;
 					}
@@ -103,16 +157,54 @@
 				document.getElementById('list').innerHTML = html;
 			};
 
+			// ─────────── 搜索过滤 ───────────
+
+			const doSearch = () => {
+				const q = document.getElementById('search').value.trim().toLowerCase();
+				const resultEl = document.getElementById('searchResult');
+				let visible = 0;
+
+				document.querySelectorAll('main li[data-date]').forEach(li => {
+					const hit = !q || li.dataset.search.includes(q);
+					li.classList.toggle('hidden', !hit);
+					if (hit) visible++;
+				});
+
+				document.querySelectorAll('main .month').forEach(sec => {
+					const any = sec.querySelector('li:not(.hidden)');
+					sec.classList.toggle('hidden', !any);
+				});
+
+				if (q) {
+					resultEl.classList.remove('hidden');
+					resultEl.textContent = visible === 0
+						? '没有找到匹配的日期'
+						: `找到 ${visible} 期匹配结果`;
+				} else {
+					resultEl.classList.add('hidden');
+				}
+			};
+
+			document.getElementById('search').addEventListener('input', doSearch);
+
+			// ─────────── 加载数据 ───────────
+
 			fetch('/news/catalogue.json')
 				.then(r => {
 					if (!r.ok) throw new Error('HTTP ' + r.status);
 					return r.json();
 				})
-				.then(render)
+				.then(json => {
+					if (!Array.isArray(json) || json.length === 0) throw new Error('empty');
+					renderHero(json);
+					renderList(json);
+				})
 				.catch(() => {
 					document.getElementById('list').innerHTML =
-						'<p>数据加载失败，请稍后重试。</p>';
-					document.getElementById('stats').textContent = '加载失败';
+						'<div class="state-msg"><h2>数据加载失败</h2><p>请稍后刷新重试。</p></div>';
+					document.getElementById('topMeta').textContent = '加载失败';
+					document.getElementById('heroSub').textContent = '';
+					document.getElementById('cardAbs').textContent = '暂时无法获取最新一期。';
 				});
 		</script>
 	</body>

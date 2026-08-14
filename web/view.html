@@ -8,6 +8,8 @@
 		<script src="./showdown.min.js"></script>
 	</head>
 	<body>
+		<div class="progress-bar" aria-hidden="true"></div>
+
 		<header class="view-bar">
 			<div class="view-bar-inner">
 				<a class="view-back" href="/">← 返回目录</a>
@@ -15,9 +17,27 @@
 			</div>
 		</header>
 
-		<article class="article markdown-body" id="view">加载中…</article>
+		<article class="article" id="article">
+			<div class="article-head">
+				<time id="headTime">…</time>
+				<h1 id="headTitle">加载中…</h1>
+			</div>
+			<nav class="toc" id="toc" hidden>
+				<div class="toc-head">本期新闻</div>
+				<ol id="tocList"></ol>
+			</nav>
+			<div class="article-body" id="view">加载中…</div>
+			<nav class="article-nav" id="articleNav" hidden>
+				<a id="navPrev" href="#"><span class="nav-label">← 前一天</span><span class="nav-date" id="navPrevDate"></span></a>
+				<a id="navNext" href="#"><span class="nav-label">后一天 →</span><span class="nav-date" id="navNextDate"></span></a>
+			</nav>
+		</article>
+
+		<button class="backtop" id="backtop" title="返回顶部" aria-label="返回顶部">↑</button>
 
 		<script>
+			const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
 			function getQueryString(name) {
 				var reg = new RegExp('(^|&)' + name + '=([^&]*)(&|$)', 'i');
 				var r = window.location.search.substr(1).match(reg);
@@ -33,26 +53,94 @@
 					parseInt(d.slice(6, 8), 10) + '日';
 			}
 
-			const date = getQueryString('date') || 'Error';
+			const date = getQueryString('date') || '';
 			const dateStr = formatDate(date);
-			const title = `${dateStr}《新闻联播》文字稿`;
-			document.title = title;
-			document.getElementById('viewTitle').textContent = title;
 
-			fetch(`/news/${date}.md`).then(response => {
-				if (response.status < 200 || response.status > 300) throw Error(response.statusText);
-				return response.text();
-			}).then(md => {
-				const converter = new showdown.Converter({
-					customizedHeaderId: true,
-					openLinksInNewWindow: true
-				});
-				document.getElementById('view').innerHTML = converter.makeHtml(md);
-			}).catch(e => {
+			if (date) {
+				document.title = `${dateStr}《新闻联播》文字稿`;
+				document.getElementById('viewTitle').textContent = `${dateStr}《新闻联播》`;
+				document.getElementById('headTime').textContent =
+					`${dateStr} · 星期${WEEKDAYS[new Date(+date.slice(0,4), +date.slice(4,6) - 1, +date.slice(6,8)).getDay()]}`;
+				document.getElementById('headTitle').textContent = '《新闻联播》文字稿';
+			} else {
 				document.getElementById('view').innerHTML =
-					'<h1>未找到该日期的文字稿</h1>' +
-					'<p>可能是当天节目尚未播出，或日期填写有误。</p>' +
-					'<p><a href="/">返回目录</a></p>';
+					'<h2>缺少日期参数</h2><p>请通过 ?date=YYYYMMDD 访问，例如 <a href="/web/view?date=20260810">/web/view?date=20260810</a></p>';
+			}
+
+			// ─────────── 加载正文 ───────────
+
+			if (date) {
+				fetch(`/news/${date}.md`).then(response => {
+					if (response.status < 200 || response.status > 300) throw Error(response.statusText);
+					return response.text();
+				}).then(md => {
+					const converter = new showdown.Converter({
+						customizedHeaderId: true,
+						openLinksInNewWindow: true
+					});
+					const el = document.getElementById('view');
+					el.innerHTML = converter.makeHtml(md);
+
+					// 为 h3 新闻标题加锚点 id, 并生成"本期新闻"目录
+					const heads = el.querySelectorAll('h3');
+					if (heads.length > 0) {
+						const list = document.getElementById('tocList');
+						heads.forEach((h, i) => {
+							const id = 'news-' + (i + 1);
+							h.id = id;
+							const li = document.createElement('li');
+							const a = document.createElement('a');
+							a.href = '#' + id;
+							a.textContent = h.textContent;
+							li.appendChild(a);
+							list.appendChild(li);
+						});
+						document.getElementById('toc').hidden = false;
+					}
+				}).catch(() => {
+					document.getElementById('view').innerHTML =
+						'<h2>未找到该日期的文字稿</h2>' +
+						'<p>可能是当天节目尚未播出，或日期填写有误。</p>' +
+						'<p><a href="/">返回目录</a></p>';
+				});
+
+				// 上一篇 / 下一篇: 从 catalogue 找相邻日期
+				fetch('/news/catalogue.json').then(r => r.json()).then(json => {
+					const idx = json.findIndex(item => item.date === date);
+					if (idx < 0) return;
+					const prev = json[idx + 1];
+					const next = json[idx - 1];
+					if (prev) {
+						document.getElementById('navPrev').href = `/web/view?date=${prev.date}`;
+						document.getElementById('navPrevDate').textContent = formatDate(prev.date);
+					} else {
+						document.getElementById('navPrev').remove();
+					}
+					if (next) {
+						document.getElementById('navNext').href = `/web/view?date=${next.date}`;
+						document.getElementById('navNextDate').textContent = formatDate(next.date);
+					} else {
+						document.getElementById('navNext').remove();
+					}
+					document.getElementById('articleNav').hidden = false;
+				}).catch(() => {});
+			}
+
+			// ─────────── 返回顶部按钮 ───────────
+
+			const backtop = document.getElementById('backtop');
+			let ticking = false;
+			window.addEventListener('scroll', () => {
+				if (ticking) return;
+				ticking = true;
+				requestAnimationFrame(() => {
+					backtop.classList.toggle('show', window.scrollY > 600);
+					ticking = false;
+				});
+			}, { passive: true });
+
+			backtop.addEventListener('click', () => {
+				window.scrollTo({ top: 0, behavior: 'smooth' });
 			});
 		</script>
 	</body>
