@@ -12,8 +12,8 @@ const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK;
 // 干跑模式: 设置 FEISHU_DRY_RUN=1 时只打印消息不发送, 用于本地调试
 const DRY_RUN = process.env.FEISHU_DRY_RUN === '1';
 
-// 网页版地址 (消息里"查看完整版"按钮的链接, 默认指向 Cloudflare Pages 部署的网页版)
-const REPO_URL = process.env.REPO_URL || 'https://xin-wen-lian-bo.pages.dev';
+// 网页版地址 (消息里"查看完整版"按钮的链接, 指向 Cloudflare Pages 部署的网页版)
+const REPO_URL = process.env.REPO_URL || 'https://xwlb.zhengyunlong.com';
 
 // catalogue.json 与 news 目录路径
 const CATALOGUE_JSON_PATH = path.join(__dirname, 'news', 'catalogue.json');
