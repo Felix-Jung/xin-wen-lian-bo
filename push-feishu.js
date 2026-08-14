@@ -42,19 +42,26 @@ const getLatest = () => {
 	return catalogue[0];
 };
 
-// 组装飞书 interactive 消息卡片: 标题 + 摘要 + 查看完整版链接
+// 组装飞书 interactive 消息卡片: 标题 + 完整摘要(分块) + 查看完整版链接
 const buildMessage = ({ date, abstract }) => {
 	// 完整版链接指向 Cloudflare Pages 网页版 (渲染好的 markdown)
 	const url = `${REPO_URL}/web/view?date=${date}`;
 	const dateStr = formatDate(date);
 
 	// 摘要可能为空 (简介抓取失败), 给个兜底
-	// 央视原数据含大量 \n\n\n, 压缩为单个换行让卡片更紧凑
-	const safeAbstract = (abstract || '')
+	// 央视原数据含大量 \n\n\n, 压缩为单个换行, 每条一行
+	const flat = (abstract || '')
 		.replace(/\n{3,}/g, '\n')
 		.trim() || '(本期暂无摘要)';
 
-	// 飞书 interactive 卡片: 标题 + 摘要 + 查看完整版链接
+	// 按每 5 行一块拆分为多个 div 元素:
+	// 飞书对卡片内单个文本元素的显示行数有限制, 长摘要放一个元素会被截断
+	const lines = flat.split('\n');
+	const groups = [];
+	for (let i = 0; i < lines.length; i += 5) {
+		groups.push(lines.slice(i, i + 5).join('\n'));
+	}
+
 	return {
 		msg_type: 'interactive',
 		card: {
@@ -67,13 +74,13 @@ const buildMessage = ({ date, abstract }) => {
 				template: 'blue',
 			},
 			elements: [
-				{
+				...groups.map(content => ({
 					tag: 'div',
 					text: {
 						tag: 'lark_md',
-						content: safeAbstract,
+						content,
 					},
-				},
+				})),
 				{
 					tag: 'action',
 					actions: [
