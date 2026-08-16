@@ -28,16 +28,33 @@ jobs:
       - name: Fetch news
         run: |
           if [ -n "${{ inputs.date }}" ]; then
+            echo "FETCH_DATE=${{ inputs.date }}" >> $GITHUB_ENV
             npm run index -- --date ${{ inputs.date }}
           else
+            echo "FETCH_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
             npm run index
           fi
       - run: git config --local user.email "github-actions[bot]@github.com"
       - run: git config --local user.name "github-actions[bot]"
       - run: git add .
-      # 判空: 当天节目尚未播出 / 抓取为空时, 不会有 diff, 此时跳过 commit, 避免任务变红失败
-      - name: Commit if there are changes
+      # 完整性门槛 + 判空:
+      #  - 当天抓取新闻数 < 10 条视为央视尚未发布完, 不提交不推送
+      #    (等 GitHub 延迟触发或 20:40 Worker 重试抓全后再走完整流程)
+      #  - 历史补数据不受此限 (早期年份详情页存活率低, 条数少也入库)
+      #  - 无 diff 时跳过 commit, 避免任务变红
+      - name: Commit if new content is complete
         run: |
+          F="news/${FETCH_DATE}.md"
+          if [ -f "$F" ]; then
+            COUNT=$(grep -c '^### ' "$F" || true)
+            TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
+            echo "新闻条数: $COUNT (日期 $FETCH_DATE)"
+            if [ "$FETCH_DATE" = "$TODAY" ] && [ "$COUNT" -lt 10 ]; then
+              echo "当天内容不完整(<10条), 央视可能未发布完, 本次不提交"
+              echo "HAS_CHANGES=false" >> $GITHUB_ENV
+              exit 0
+            fi
+          fi
           if git diff --cached --quiet; then
             echo "No changes to commit, skipping."
             echo "HAS_CHANGES=false" >> $GITHUB_ENV
