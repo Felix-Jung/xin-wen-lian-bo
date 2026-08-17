@@ -42,9 +42,38 @@
 			function getQueryString(name) {
 				var reg = new RegExp('(^|&)' + name + '=([^&]*)(&|$)', 'i');
 				var r = window.location.search.substr(1).match(reg);
-				if (r != null) return unescape(r[2]);
+				if (r != null) return decodeURIComponent(r[2]);
 				return null;
 			}
+
+			// ─────────── 关键词高亮 ───────────
+			// 遍历正文所有文本节点, 命中处切分包 <mark class="hl">; 不碰标签结构
+			function highlightIn(rootEl, q) {
+				if (!q || q.length < 1) return;
+				var lq = q.toLowerCase();
+				var walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT);
+				var nodes = [], n;
+				while ((n = walker.nextNode())) {
+					if (n.nodeValue.toLowerCase().indexOf(lq) >= 0) nodes.push(n);
+				}
+				nodes.forEach(function (node) {
+					var text = node.nodeValue, lt = text.toLowerCase();
+					var frag = document.createDocumentFragment();
+					var i = 0;
+					for (;;) {
+						var p = lt.indexOf(lq, i);
+						if (p < 0) { frag.appendChild(document.createTextNode(text.slice(i))); break; }
+						if (p > i) frag.appendChild(document.createTextNode(text.slice(i, p)));
+						var mk = document.createElement('mark');
+						mk.className = 'hl';
+						mk.textContent = text.slice(p, p + lq.length);
+						frag.appendChild(mk);
+						i = p + lq.length;
+					}
+					node.parentNode.replaceChild(frag, node);
+				});
+			}
+			var hlQuery = getQueryString('q') || '';
 
 			// YYYYMMDD -> 2026年8月13日
 			function formatDate(d) {
@@ -98,6 +127,9 @@
 						});
 						document.getElementById('toc').hidden = false;
 					}
+
+					// 正文渲染完成后做关键词高亮 (从搜索结果点进来时)
+					highlightIn(el, hlQuery);
 				}).catch(() => {
 					document.getElementById('view').innerHTML =
 						'<h2>未找到该日期的文字稿</h2>' +
@@ -113,13 +145,13 @@
 					const prev = sorted[idx + 1];
 					const next = sorted[idx - 1];
 					if (prev) {
-						document.getElementById('navPrev').href = `/web/view?date=${prev.date}`;
+						document.getElementById('navPrev').href = `/web/view?date=${prev.date}` + (hlQuery ? '&q=' + encodeURIComponent(hlQuery) : '');
 						document.getElementById('navPrevDate').textContent = formatDate(prev.date);
 					} else {
 						document.getElementById('navPrev').remove();
 					}
 					if (next) {
-						document.getElementById('navNext').href = `/web/view?date=${next.date}`;
+						document.getElementById('navNext').href = `/web/view?date=${next.date}` + (hlQuery ? '&q=' + encodeURIComponent(hlQuery) : '');
 						document.getElementById('navNextDate').textContent = formatDate(next.date);
 					} else {
 						document.getElementById('navNext').remove();

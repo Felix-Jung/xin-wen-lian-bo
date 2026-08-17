@@ -89,6 +89,55 @@
 				return flat.length > max ? flat.slice(0, max) + '…' : flat;
 			};
 
+			// 关键词高亮: 按命中位置切分, 匹配段包 <mark>, 纯 DOM 操作防注入
+			const appendHighlighted = (el, text, q) => {
+				if (!q) { el.appendChild(document.createTextNode(text)); return; }
+				const lt = text.toLowerCase(), lq = q.toLowerCase();
+				let i = 0;
+				for (;;) {
+					const at = lt.indexOf(lq, i);
+					if (at < 0) { el.appendChild(document.createTextNode(text.slice(i))); return; }
+					if (at > i) el.appendChild(document.createTextNode(text.slice(i, at)));
+					const mk = document.createElement('mark');
+					mk.className = 'hl';
+					mk.textContent = text.slice(at, at + lq.length);
+					el.appendChild(mk);
+					i = at + lq.length;
+				}
+			};
+
+			// 搜索时重写可见条目的摘要行: 提要命中 -> 高亮提要;
+			// 仅正文命中 -> 用年份分片全文截"命中处前后"摘要 (ft-snippet 样式区分)
+			const applyHighlights = lq => {
+				document.querySelectorAll('main li[data-date]').forEach(li => {
+					const abs = li.querySelector('.news-abs');
+					if (!abs) return;
+					const item = allItems[+li.dataset.idx];
+					abs.textContent = '';
+					abs.classList.remove('ft-snippet');
+					if (!lq || !item) {
+						abs.appendChild(document.createTextNode(summarize(item && item.abstract, 60)));
+						return;
+					}
+					const flat = (item.abstract || '').replace(/\s*\n\s*/g, ' ').trim();
+					if (flat.toLowerCase().includes(lq)) {
+						appendHighlighted(abs, flat.slice(0, 80), lq);
+						return;
+					}
+					const shard = fullTextCache[item.date.slice(0, 4)] || [];
+					const full = shard.find(x => x.d === item.date);
+					const text = full ? full.t.replace(/\s+/g, ' ') : '';
+					const at = text.toLowerCase().indexOf(lq);
+					if (at >= 0) {
+						const s = (at > 40 ? '…' : '') + text.slice(Math.max(0, at - 40), at + 90) + '…';
+						abs.classList.add('ft-snippet');
+						appendHighlighted(abs, s, lq);
+					} else {
+						abs.appendChild(document.createTextNode(summarize(item.abstract, 60)));
+					}
+				});
+			};
+
 			// 日期可搜索文本: 各种日期写法
 			const dateText = item => {
 				const d = parseDate(item.date);
@@ -181,17 +230,18 @@
 				});
 			};
 
-			// 日期模式: 只匹配日期文本
-			const doDateSearch = lq => {
-				let visible = 0;
-				document.querySelectorAll('main li[data-date]').forEach(li => {
-					const idx = +li.dataset.idx;
-					const hit = !lq || (dateIndex[idx] && dateIndex[idx].includes(lq));
-					li.classList.toggle('hidden', !hit);
-					li.classList.toggle('ft-only', false);
-					if (hit) visible++;
-				});
-				hideByMonths();
+		// 日期模式: 只匹配日期文本
+		const doDateSearch = lq => {
+			let visible = 0;
+			document.querySelectorAll('main li[data-date]').forEach(li => {
+				const idx = +li.dataset.idx;
+				const hit = !lq || (dateIndex[idx] && dateIndex[idx].includes(lq));
+				li.classList.toggle('hidden', !hit);
+				li.classList.toggle('ft-only', false);
+				if (hit) visible++;
+			});
+			hideByMonths();
+			applyHighlights(''); // 日期模式不清摘要高亮
 				const resultEl = document.getElementById('searchResult');
 				if (lq) {
 					resultEl.classList.remove('hidden');
@@ -214,10 +264,11 @@
 					li.classList.toggle('hidden', !show);
 					// 标记"仅正文命中"(提要里没有, 正文里有)
 					li.classList.toggle('ft-only', show && !inSummary);
-					if (inSummary) summaryCount++;
-					if (show) shown++;
-				});
-				hideByMonths();
+				if (inSummary) summaryCount++;
+				if (show) shown++;
+			});
+			hideByMonths();
+			applyHighlights(lq); // 提要高亮 / 正文命中摘要
 				const resultEl = document.getElementById('searchResult');
 				if (lq) {
 					resultEl.classList.remove('hidden');
@@ -300,6 +351,14 @@
 			});
 
 			document.getElementById('search').addEventListener('input', doSearch);
+
+			// 内容搜索时点进某期, 把关键词带给文章页做正文高亮
+			document.getElementById('list').addEventListener('click', e => {
+				const a = e.target.closest('a[href*="view"]');
+				if (!a) return;
+				const lq = document.getElementById('search').value.trim();
+				if (searchMode === 'content' && lq) a.href += '&q=' + encodeURIComponent(lq);
+			});
 
 			// ─────────── 加载数据 ───────────
 
