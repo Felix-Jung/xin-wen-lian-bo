@@ -7,12 +7,8 @@ on:
         description: '抓取指定日期 YYYYMMDD (留空=今天)'
         required: false
         default: ''
-  schedule:
-    # 东八区 (UTC+8), 所以要-8小时
-    # 19:35 抓取 (新闻联播 19:30 播完, 文字稿 19:00-19:32 逐条发布)
-    # 注: GitHub Actions 的 schedule 实际执行可能延迟 1-2.5h (排队),
-    #     准时的 19:35 触发由 Cloudflare Worker Cron 兜底 (见仓库说明)
-    - cron: '35 11 * * *'
+  # schedule 已退役: 日常抓取由 Cloudflare Worker xwlb-crawler 负责 (19:35/20:40)
+  # 本 workflow 保留 workflow_dispatch 作为应急手动链路
 
 jobs:
   update:
