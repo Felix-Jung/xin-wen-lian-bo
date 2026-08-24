@@ -7,8 +7,7 @@ on:
         description: '抓取指定日期 YYYYMMDD (留空=今天)'
         required: false
         default: ''
-  # schedule 已退役: 日常抓取由 Cloudflare Worker xwlb-crawler 负责 (19:35/20:40)
-  # 本 workflow 保留 workflow_dispatch 作为应急手动链路
+  # schedule 已退役: 由 CF Worker xwlb-crawler 准点触发 dispatch (19:35 起)
 
 jobs:
   update:
@@ -20,7 +19,6 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      # 手动触发时可指定日期补数据/重跑; 定时触发留空则抓今天
       - name: Fetch news
         run: |
           if [ -n "${{ inputs.date }}" ]; then
@@ -33,11 +31,8 @@ jobs:
       - run: git config --local user.email "github-actions[bot]@github.com"
       - run: git config --local user.name "github-actions[bot]"
       - run: git add .
-      # 完整性门槛 + 判空:
-      #  - 当天抓取新闻数 < 10 条视为央视尚未发布完, 不提交不推送
-      #    (等 GitHub 延迟触发或 20:40 Worker 重试抓全后再走完整流程)
-      #  - 历史补数据不受此限 (早期年份详情页存活率低, 条数少也入库)
-      #  - 无 diff 时跳过 commit, 避免任务变红
+      # 完整性门槛: 当天 <10 条视为央视未发布完, 不提交 (Worker 下一轮重试)
+      # 历史补数据不受此限
       - name: Commit if new content is complete
         run: |
           F="news/${FETCH_DATE}.md"
@@ -46,7 +41,7 @@ jobs:
             TODAY=$(TZ=Asia/Shanghai date +%Y%m%d)
             echo "新闻条数: $COUNT (日期 $FETCH_DATE)"
             if [ "$FETCH_DATE" = "$TODAY" ] && [ "$COUNT" -lt 10 ]; then
-              echo "当天内容不完整(<10条), 央视可能未发布完, 本次不提交"
+              echo "当天内容不完整(<10条), 本次不提交"
               echo "HAS_CHANGES=false" >> $GITHUB_ENV
               exit 0
             fi
@@ -58,33 +53,9 @@ jobs:
             git commit -m "AUTO UPDATE [bot]"
             echo "HAS_CHANGES=true" >> $GITHUB_ENV
           fi
-      # 容错: push 失败不中止 job, 后面的飞书通知照常执行
-      # (否则 push 失败会导致整个 job 红 + 飞书被跳过)
       - name: Push master changes
         if: env.HAS_CHANGES == 'true'
-        continue-on-error: true
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: master
-      # 推送飞书通知: 仅当今天有抓到新内容时才推送
-      # continue-on-error: 推送是附加功能, 失败不应让整个 workflow 变红
-      - name: Notify Feishu webhook
-        if: env.HAS_CHANGES == 'true'
-        continue-on-error: true
-        env:
-          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-        run: node push-feishu.js
-      # 构建全文搜索分片 (search/YYYY.json): 每天抓取后重建, 供网页内容模式全文检索
-      - name: Build search index
-        if: env.HAS_CHANGES == 'true' || github.event_name == 'workflow_dispatch'
-        run: node build-search-index.js
-      # 同步到 Cloudflare Pages (网页版): 有新内容时自动部署; 手动触发(含纯代码改动)也部署
-      # continue-on-error: 部署失败不影响数据已入库
-      - name: Deploy to Cloudflare Pages
-        if: env.HAS_CHANGES == 'true' || github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx -y wrangler@4 pages deploy . --project-name xin-wen-lian-bo --branch master --commit-dirty=true
